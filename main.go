@@ -53,19 +53,6 @@ var CityData = make(map[int]City)
 var RoadData = make(map[int]Road)
 
 func main() {
-	CityData[21] = City{Name: "Tehran"}
-	CityData[251] = City{Name: "Qom"}
-	CityData[361] = City{Name: "Kashan"}
-
-	RoadData[1] = Road{
-		Name:          "T-K",
-		From:          21,
-		To:            361,
-		Through:       []int{21, 251},
-		SpeedLimit:    80,
-		Length:        600,
-		BiDirectional: false,
-	}
 	var req InputReq
 	req.Input = 0
 	for {
