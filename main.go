@@ -1,213 +1,203 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
 
-type InputReq struct {
-	Input Action
-	Model Model
-	City  City
-	Road  Road
+type TravelHandler struct {
+	CityService *CityService
+	RoadService *RoadService
 }
 
-type Action int
+func NewTravelHandler(cityService *CityService, roadService *RoadService) *TravelHandler {
+	return &TravelHandler{CityService: cityService, RoadService: roadService}
+}
+
+type Menu int
 type Model int
 
 const (
-	MainMenu  Action = 0
-	Help      Action = 1
-	Add       Action = 2
-	Delete    Action = 3
-	Path      Action = 4
-	Exit      Action = 5
-	cityModel Model  = 1
-	roadModel Model  = 2
-
-	initiateMenu = `Main Menu - Select an action: 
-1. Help
-2. Add
-3. Delete
-4. Path
-5. Exit`
-	invalidInputMsg = "Invalid input. Please enter 1 for more info."
-	helpMsg         = "Select a number from shown menu and enter. For example 1 is for help"
+	MainMenu  Menu  = 0
+	Help      Menu  = 1
+	Add       Menu  = 2
+	Delete    Menu  = 3
+	Path      Menu  = 4
+	Exit      Menu  = 5
+	cityModel Model = 1
+	roadModel Model = 2
 )
 
 type City struct {
+	Id   uint
 	Name string
 }
 type Road struct {
+	Id            uint
 	Name          string
-	From          int
-	To            int
-	Through       []int
-	SpeedLimit    int
-	Length        int
+	From          uint
+	To            uint
+	Through       []uint
+	SpeedLimit    uint
+	Length        uint
 	BiDirectional bool
+	City          *City
 }
 
-var CityData = make(map[int]City)
-
-var RoadData = make(map[int]Road)
-
 func main() {
-	var req InputReq
-	req.Input = 0
+	inputHandler()
+}
+
+func inputHandler() {
+
+	handler := InitHandler()
+
+	var req Menu
 	for {
-		switch req.Input {
+		switch req {
 		case MainMenu:
-			fmt.Println(initiateMenu)
-			fmt.Scanln(&req.Input)
+			handler.MainMenuHandler()
 		case Help:
-			req.HelpFunc()
+			handler.HelpHandler()
 		case Add:
-			req.AddFunc()
+			handler.AddModelHandler()
 		case Delete:
-			req.DeleteFunc()
-			req.Input = 0
+			handler.DeleteModelHandler()
+			req = MainMenu
 		case Path:
-			req.PathFunc()
+			handler.PathHandler()
 		case Exit:
 			return
 		default:
-			fmt.Println(invalidInputMsg)
-			fmt.Scanln(&req.Input)
+			handler.InvalidInputHandler()
 		}
+		GetMenu(&req)
 	}
 }
 
-func (input *InputReq) AddFunc() *Action {
-	var (
-		id   int
-		item string
-	)
-	model := input.selectModel()
+func InitHandler() *TravelHandler {
+	//init repositories
+	cityRepo := NewMapCityRepo()
+	roadRepo := NewMapRoadRepo()
 
+	// init services
+	cityService := NewCityService(cityRepo)
+	roadService := NewRoadService(roadRepo)
+
+	// init handler
+	handler := NewTravelHandler(cityService, roadService)
+	return handler
+}
+
+func (h *TravelHandler) MainMenuHandler() {
+	fmt.Println("Main Menu - Select an action:")
+	fmt.Println("1. Help")
+	fmt.Println("2. Add")
+	fmt.Println("3. Delete")
+	fmt.Println("4. Path")
+	fmt.Println("5. Exit")
+}
+
+func GetMenu(input *Menu) {
+	_, err := fmt.Scanln(input)
+	if err != nil {
+		return
+	}
+}
+
+func (h *TravelHandler) AddModelHandler() {
+	model := selectModel()
 	for {
-		fmt.Println("id=?")
-		fmt.Scanln(&id)
-		fmt.Println("name=?")
-		switch model {
+		switch Model(model) {
 		case cityModel:
-			item = "City"
-			fmt.Scanln(&input.City.Name)
-			CityData[id] = City{
-				Name: input.City.Name,
-			}
-			fmt.Println("city is :", CityData[id])
+
+			h.CityService.CreateCity()
 		case roadModel:
-			item = "Road"
-			fmt.Scanln(&input.Road.Name)
-			fmt.Println("from?")
-			fmt.Scanln(&input.Road.From)
-			fmt.Println("to?")
-			fmt.Scanln(&input.Road.To)
-			fmt.Println("through?")
-			fmt.Scanln(&input.Road.Through)
-			fmt.Println("speed_limit?")
-			fmt.Scanln(&input.Road.SpeedLimit)
-			fmt.Println("length?")
-			fmt.Scanln(&input.Road.Length)
-			fmt.Println("bi_directional?")
-			var biDirectional int
-			fmt.Scanln(&biDirectional)
-			if biDirectional == 1 {
-				input.Road.BiDirectional = true
-			} else {
-				input.Road.BiDirectional = false
-			}
-			RoadData[id] = Road{
-				Name:          input.Road.Name,
-				From:          input.Road.From,
-				To:            input.Road.To,
-				Through:       input.Road.Through,
-				SpeedLimit:    input.Road.SpeedLimit,
-				Length:        input.Road.Length,
-				BiDirectional: input.Road.BiDirectional,
-			}
+			h.RoadService.CreateRoad()
 		}
-		fmt.Printf(`
+
+		var input Menu
+		GetMenu(&input)
+		if input == 2 {
+			h.MainMenuHandler()
+			return
+		}
+	}
+}
+func printSuccess(item string, id uint) {
+	fmt.Printf(`
 %s with id=%v added!
 Select your next action:
 1. Add another %s
 2. Main Menu
 `, item, id, item)
-		fmt.Scanln(&input.Input)
-		if input.Input == 2 {
-			input.Input = 0
-			return &input.Input
-		}
-	}
 }
 
-func (input *InputReq) selectModel() Model {
+func selectModel() int {
+	var m int
 	fmt.Println(`Select model:
 1. City
 2. Road`)
-	fmt.Scanln(&input.Model)
-	return input.Model
+	fmt.Scanln(&m)
+	return m
 }
 
-func (input *InputReq) HelpFunc() *Action {
-	fmt.Println(helpMsg)
-	fmt.Println(initiateMenu)
-	fmt.Scanln(&input.Input)
-	return &input.Input
+func (h *TravelHandler) HelpHandler() {
+	fmt.Println("Select a number from shown menu and enter. For example 1 is for help")
+	h.MainMenuHandler()
 }
 
-func (input *InputReq) DeleteFunc() {
-	model := input.selectModel()
-	var (
-		id   int
-		item string
-	)
-	fmt.Println("id=?")
-	switch model {
+func (h *TravelHandler) DeleteModelHandler() {
+	model := selectModel()
+
+	switch Model(model) {
 	case cityModel:
-		item = "City"
-		fmt.Scanln(&id)
-		if _, ok := CityData[id]; ok {
-			delete(CityData, id)
-			fmt.Println("%s :%v deleted!", item, id)
-		} else {
-			fmt.Printf("%s with id %v not found!", item, id)
-		}
+		h.CityService.DeleteCity()
 	case roadModel:
-		item = "Road"
-		fmt.Scanln(&id)
-		if _, ok := RoadData[id]; ok {
-			delete(RoadData, id)
-			fmt.Printf("%s :%v deleted!", item, id)
-		} else {
-			fmt.Printf("%s with id %v not found!", item, id)
-		}
+		h.RoadService.DeleteRoad()
 	}
 }
 
-func (input *InputReq) PathFunc() *Action {
+func (h *TravelHandler) PathHandler() *Menu {
 	var (
-		SourceCityId, DestinationCityId int
-		RoadName                        string
-		TakeTime                        time.Duration
+		SourceCityId, DestinationCityId uint
 	)
 	fmt.Scanf("%v:%v", &SourceCityId, &DestinationCityId)
-	SourceCityName, _ := CityData[SourceCityId]
-	DestinationCityName, _ := CityData[DestinationCityId]
-	for _, value := range RoadData {
-		var linkedList []int
-		linkedList = append(linkedList, value.From)
-		linkedList = append(linkedList, value.Through...)
-		linkedList = append(linkedList, value.To)
+
+	SourceCityName, _ := h.CityService.GetCity(SourceCityId)
+	DestinationCityName, _ := h.CityService.GetCity(DestinationCityId)
+
+	AllRoads := h.RoadService.GetAllRoads()
+
+	roadName, takeTime := findThePath(SourceCityId, DestinationCityId, AllRoads)
+
+	fmt.Printf("%s:%s via Road %s: Takes %v", SourceCityName, DestinationCityName, roadName, takeTime)
+
+	return nil
+}
+
+func findThePath(SourceCityId, DestinationCityId uint, allRoads []*Road) (string, time.Duration) {
+	var (
+		RoadName string
+		TakeTime time.Duration
+	)
+
+	for _, road := range allRoads {
+		var cities []uint
+		cities = append(cities, road.From)
+		cities = append(cities, road.Through...)
+		cities = append(cities, road.To)
+
 		found1 := false
 		found2 := false
-		for i, city := range linkedList {
-			if !value.BiDirectional {
+
+		for i, city := range cities {
+			if !road.BiDirectional {
 				if city == SourceCityId {
-					if linkedList[i+1] == DestinationCityId {
-						RoadName = value.Name
-						TakeTime = time.Duration(value.Length / value.SpeedLimit)
+					if cities[i+1] == DestinationCityId {
+						RoadName = road.Name
+						TakeTime = time.Duration(road.Length / road.SpeedLimit)
 						break
 					}
 				} else {
@@ -220,14 +210,175 @@ func (input *InputReq) PathFunc() *Action {
 					found2 = true
 				}
 				if found1 && found2 {
-					RoadName = value.Name
-					TakeTime = time.Duration(value.Length / value.SpeedLimit)
+					RoadName = road.Name
+					TakeTime = time.Duration(road.Length / road.SpeedLimit)
 				}
 			}
 		}
 	}
+	return RoadName, TakeTime
 
-	fmt.Printf("%s:%s via Road %s: Takes %v", SourceCityName, DestinationCityName, RoadName, TakeTime)
+}
 
+func (h *TravelHandler) InvalidInputHandler() {
+	fmt.Println("Invalid input. Please enter 1 for more info.")
+}
+
+type IRoadRepository interface {
+	getAll() []*Road
+	create(road Road) error
+	delete(id uint) error
+}
+
+type ICityRepository interface {
+	get(id uint) (*City, error)
+	create(city City) error
+	delete(id uint) error
+}
+
+type MapRoadRepo struct {
+	repo map[uint]Road
+}
+
+func NewMapRoadRepo() *MapRoadRepo {
+	return &MapRoadRepo{repo: make(map[uint]Road)}
+}
+
+func (m *MapRoadRepo) getAll() []*Road {
+	var roadList []*Road
+	for _, road := range m.repo {
+		roadList = append(roadList, &road)
+	}
+	return roadList
+}
+
+func (m MapRoadRepo) create(road Road) error {
+	m.repo[road.Id] = road
 	return nil
+}
+
+func (m MapRoadRepo) delete(id uint) error {
+	if _, ok := m.repo[id]; ok {
+		delete(m.repo, id)
+		return nil
+	}
+	return errors.New("")
+}
+
+type RoadService struct {
+	repo IRoadRepository
+}
+
+func NewRoadService(repo IRoadRepository) *RoadService {
+	return &RoadService{repo: repo}
+}
+
+func (s *RoadService) CreateRoad() {
+	var road Road
+	fmt.Println("id=?")
+	fmt.Scanln(&road.Id)
+	fmt.Scanln(&road.Name)
+	fmt.Println("from?")
+	fmt.Scanln(&road.From)
+	fmt.Println("to?")
+	fmt.Scanln(&road.To)
+	fmt.Println("through?")
+	fmt.Scanln(&road.Through)
+	fmt.Println("speed_limit?")
+	fmt.Scanln(&road.SpeedLimit)
+	fmt.Println("length?")
+	fmt.Scanln(&road.Length)
+	fmt.Println("bi_directional?")
+	var biDirectional int
+	fmt.Scanln(&biDirectional)
+	if biDirectional == 1 {
+		road.BiDirectional = true
+	} else {
+		road.BiDirectional = false
+	}
+	s.repo.create(road)
+	printSuccess("Road", road.Id)
+
+}
+
+func (s *RoadService) DeleteRoad() {
+	var id uint
+	fmt.Scanln(&id)
+	if err := s.DeleteRoad; err != nil {
+		fmt.Printf("Road with id %v not found!", id)
+	} else {
+		fmt.Printf("Road :%v deleted!", id)
+	}
+}
+
+func (s *RoadService) GetAllRoads() []*Road {
+	return s.repo.getAll()
+}
+
+type MapCityRepo struct {
+	repo map[uint]City
+}
+
+func NewMapCityRepo() *MapCityRepo {
+	cityMap := make(map[uint]City)
+	return &MapCityRepo{repo: cityMap}
+}
+
+func (m MapCityRepo) get(id uint) (*City, error) {
+	city, ok := m.repo[id]
+	if !ok {
+		return nil, errors.New("")
+	}
+	return &city, nil
+}
+
+func (m MapCityRepo) create(city City) error {
+	m.repo[city.Id] = city
+	return nil
+}
+
+func (m MapCityRepo) delete(id uint) error {
+	if _, ok := m.repo[id]; ok {
+		delete(m.repo, id)
+		return nil
+	}
+	return errors.New("")
+}
+
+type CityService struct {
+	repo ICityRepository
+}
+
+func NewCityService(repo ICityRepository) *CityService {
+	return &CityService{repo: repo}
+}
+
+func (s *CityService) CreateCity() {
+	var city City
+	fmt.Println("id=?")
+	fmt.Scanln(&city.Id)
+	fmt.Println("name=?")
+	fmt.Scanln(&city.Name)
+	s.repo.create(city)
+
+	printSuccess("City", city.Id)
+}
+func (s *CityService) DeleteCity() {
+	var id uint
+	fmt.Println("id?")
+	fmt.Scanln(&id)
+	err := s.repo.delete(id)
+	if err != nil {
+		fmt.Printf("City with id %v not found!", id)
+	} else {
+		fmt.Printf("City : %v deleted!", id)
+	}
+}
+
+func (s *CityService) GetCity(id uint) (*City, error) {
+	city, err := s.repo.get(id)
+	if err != nil {
+		return nil, err
+	}
+	return city, nil
 }
